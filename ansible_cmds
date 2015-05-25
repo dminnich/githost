@@ -1,0 +1,2 @@
+ansible-playbook -i inventory install-server.yaml  -v
+ansible-playbook -i inventory add-user.yaml --extra-vars "username=jimmy pubkey=/tmp/id_rsa.pub"

@@ -1,0 +1,26 @@
+<%= @@fqdn %> is a free static content webhost backed by git.  Simply "git push" then view your changes at http://<%= @@fqdn %>/~username.
+<br />
+<br />
+<h2>Signup:</h2>
+<b>Terms Of Service:</b> <br/>Clicking "submit" below signifies that you have read and will abide by the rules in the following paragraph....<br /><br />
+This service is offered "as-is" and with no warranties or guarantees whatsoever.You are responsible for the content you upload and how your account is used. Any account found hosting illegal, immoral or questionable content will be deleted without notice.  Accounts abusing bandwidth, processing storage or any other resources will be removed as well. These terms and the service as a whole may change at anytime with no notice whatsoever.
+<form action="/form" method="post" enctype="multipart/form-data"> <br />
+ Username: <input type="text" name="username"> <br />
+ SSH key <input type="file" name="sshkey"> <br />
+  <input type="submit">
+</form>
+
+<h2>How do I use this?</h2>
+<ol>
+<li>Generate an ssh-key if you don't have one -- ssh-keygen</li>
+<li>Choose a username and upload your .pub file above</li>
+<li>git clone ssh://username@<%= @@fqdn %>/home/username/geekhost_home_folder</li>
+<li>cd geekhost_home_folder</li>
+<li>edit your public_html/index.html page</li>
+<li>git add .</li>
+<li>git commit -m "first edit"</li>
+<li>git push origin master</li>
+<li>view http://<%= @@fqdn %>/~username</li>
+</ol>
+Still lost?  <br />
+Try this <a href="http://rogerdudler.github.io/git-guide/">git guide</a> and this <a href="https://help.github.com/articles/generating-ssh-keys/"> SSH tutorial</a> or use google to learn more.

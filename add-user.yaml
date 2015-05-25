@@ -1,0 +1,32 @@
+---
+- hosts: githost
+
+  vars_prompt:
+  - name: username
+    prompt: "whats the users name?"
+    private: no
+  - name: pubkey
+    prompt: "where is the users public ssh key?"
+    private: no
+
+  tasks:
+  - name: creating user
+    user: name={{ username }} shell=/usr/bin/git-shell 
+
+  - name: setting users ssh key
+    authorized_key: user={{ username }} key="{{ item }}" 
+    with_file:
+    - "{{ pubkey }}"
+
+  - name: copying over original public_html
+    copy: src=files/{{ item }} dest=/home/{{ username }} force=no directory_mode=0755 mode=0644 owner={{ username }} group={{ username }} 
+    with_items:
+    - public_html
+  #need execute perms for git post-recieve hooks
+  - name: copying over git repo
+    copy: src=files/{{ item }} dest=/home/{{ username }} force=no directory_mode=0755 mode=0755 owner={{ username }} group={{ username }} 
+    with_items:
+    - geekhost_home_folder.git 
+
+  - name: all done
+    debug: msg="Tell the user to 'git clone ssh://{{ username }}@{{ ansible_fqdn }}/home/{{ username }}/geekhost_home_folder' to get started"

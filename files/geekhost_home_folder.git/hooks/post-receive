@@ -1,0 +1,13 @@
+#!/bin/bash
+set -x 
+echo "Deploying your site"
+rm -Rf ${HOME}/tmp/
+mkdir ${HOME}/tmp/
+cd ${HOME}/tmp/
+git clone -b master ${HOME}/geekhost_home_folder.git
+cd ${HOME}/tmp/geekhost_home_folder
+rm -Rf ${HOME}/public_html
+cp -Rf ${HOME}/tmp/geekhost_home_folder/public_html/ ${HOME}
+chown -Rf ${USER}.${USER} ${HOME}/public_html/
+chmod -Rf o=rwX,g=rX,o=rX ${HOME}/public_html/
+rm -Rf ${HOME}/tmp/

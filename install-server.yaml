@@ -1,0 +1,125 @@
+---
+- hosts: githost
+
+  tasks:
+  # should configure quotas later
+  # should find or write a custom passenger selinux policy later
+  #- name: disable selinux (passenger is a bitch)# causes machines to need to be rebooted
+  #  selinux: policy=disabled state=disabled
+  
+  - name: configure umask for new home dirs so apache can get in
+    replace: dest=/etc/login.defs regexp='^UMASK           077.*' replace="UMASK           066"
+  
+  - name: ssh lockdown. only allow keys for root
+    lineinfile: dest=/etc/ssh/sshd_config regexp="^PermitRootLogin" line="PermitRootLogin without-password" state=present 
+    notify: restart-sshd
+    when: secure_ssh
+  
+  - name: ssh lockdown. only allow keys for all users
+    lineinfile: dest=/etc/ssh/sshd_config regexp="^PasswordAuthentication" line="PasswordAuthentication no" state=present
+    notify: restart-sshd
+    when: secure_ssh
+  
+  - name: firewall exceptions
+    firewalld: service={{ item}} permanent=true state=enabled
+    with_items:
+    - http
+    - ssh
+    notify: restart-firewalld
+  
+  - name: install packages
+    yum: pkg={{ item }} state=installed
+    with_items:
+    - git
+    - openssh-server 
+    - screen
+    - vim
+    - httpd
+    - policycoreutils-python
+    - mlocate
+    - ruby
+#passenger
+    - epel-release
+    - gcc
+    - gcc-c++
+    - libcurl-devel
+    - openssl-devel
+    - zlib-devel
+    - httpd-devel
+    - rubygem-rake
+    - ruby-devel
+    - apr-devel
+    - apr-util-devel
+  
+  - name: install gems
+    gem: name={{ item }} state=present user_install=no include_dependencies=yes
+    with_items:
+    - sinatra 
+    - passenger
+    - rack-protection
+
+  - name: create passenger user
+    user: name=passenger system=yes shell=/bin/bash state=present
+
+#should lock this down to specific playbooks later
+  - name: give passenger user sudo rights to run ansible playbooks 
+    lineinfile: dest=/etc/sudoers.d/passenger owner=root group=root mode=0440 
+                line='passenger ALL=(ALL) NOPASSWD:/usr/bin/ansible-playbook' 
+                state=present 
+                create=yes 
+                validate='visudo -cf %s'
+  
+  - name: disable tty requirement for passenger sudo
+    lineinfile: dest=/etc/sudoers line='Defaults:passenger !requiretty' state=present validate='visudo -cf %s'
+  
+  - name: check passenger install (creates glob workaround)
+    shell: ls /usr/local/share/gems/gems/passenger-*/buildout/apache2/mod_passenger.so
+    ignore_errors: True
+    changed_when: False
+    register: passenger_check
+   
+  - name: install passenger
+    shell: /usr/local/bin/passenger-install-apache2-module -a
+    when: passenger_check|failed
+
+  - name: enable services
+    service: name={{ item }} state=started enabled=yes
+    with_items:
+    - sshd.service
+    - httpd.service
+
+  - name: get passenger version for templating
+    shell: ls /usr/local/share/gems/gems/ | grep passenger | head -1 | cut -d "-" -f2
+    changed_when: False
+    register: passenger_version
+  
+  - name: copy of sinatra account creation webapp into place
+    copy: dest=/var/www/githost src=files/sinatra/ force=yes owner=root group=root
+    notify: restart-httpd
+  
+  - name: set sinatra upload dir perms
+    file: path=/var/www/githost/tmpupload/ owner=passenger group=passenger mode=0775 state=directory
+
+  - name: configure apache for userdir hosting
+    copy: dest=/etc/httpd/conf.d/userdir.conf src=files/userdir.conf mode=644 owner=root group=root force=yes
+    notify: restart-httpd
+  
+  - name: configure the signup sinatra vhost in apche
+    template: dest=/etc/httpd/conf.d/signup.conf src=templates/signup.conf mode=644 owner=root group=root
+    notify: restart-httpd
+  
+  - name: configure the standard hosting vhost in apche
+    template: dest=/etc/httpd/conf.d/www.conf src=templates/www.conf mode=644 owner=root group=root
+    notify: restart-httpd
+  
+  - name: create cron job to cleanup tmpupload ssh-key space
+    cron: state=present user=root special_time=daily name="githost tmp ssh key cleanup" job="find /var/www/githost/tmpupload/ -regex ".*/[0-9].*" -type f -mmin +90 -delete"
+  
+
+  handlers:
+  - name: restart-firewalld
+    service: name=firewalld.service state=restarted 
+  - name: restart-sshd
+    service: name=sshd.service state=restarted 
+  - name: restart-httpd
+    service: name=httpd.service state=restarted 
